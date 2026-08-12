@@ -1,0 +1,187 @@
+name: Build Test and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # -----------------------------
+      # Checkout source code
+      # -----------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------
+      # Set up Python
+      # -----------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # -----------------------------
+      # Install dependencies
+      # -----------------------------
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r app/requirements.txt
+          pip install pytest httpx
+
+      # -----------------------------
+      # Run tests
+      # -----------------------------
+      - name: Run tests
+        run: |
+          pytest -v
+
+      # -----------------------------
+      # Log in to GitHub Container Registry
+      # -----------------------------
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # -----------------------------
+      # Build Docker image
+      # -----------------------------
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t $IMAGE_NAME:${{ github.sha }} \
+            -t $IMAGE_NAME:latest \
+            .
+
+      # -----------------------------
+      # Push Docker image
+      # -----------------------------
+      - name: Push Docker image
+        run: |
+          docker push $IMAGE_NAME:${{ github.sha }}
+          docker push $IMAGE_NAME:latest
+
+      # -----------------------------
+      # Create Kind cluster
+      # -----------------------------
+      - name: Create Kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: infra-challenge
+
+      # -----------------------------
+      # Load image into Kind
+      # -----------------------------
+      - name: Load image into Kind
+        run: |
+          kind load docker-image \
+            $IMAGE_NAME:${{ github.sha }} \
+            --name infra-challenge
+
+      # -----------------------------
+      # Create namespace
+      # -----------------------------
+      - name: Create namespace
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+
+      # -----------------------------
+      # Create PostgreSQL secret
+      # -----------------------------
+      - name: Create PostgreSQL secret
+        run: |
+          kubectl create secret generic postgres-secret \
+            --namespace infra-challenge \
+            --from-literal=POSTGRES_DB=appdb \
+            --from-literal=POSTGRES_USER=appuser \
+            --from-literal=POSTGRES_PASSWORD=apppassword
+
+      # -----------------------------
+      # Create backend secret
+      # -----------------------------
+      - name: Create backend secret
+        run: |
+          kubectl create secret generic backend-secret \
+            --namespace infra-challenge \
+            --from-literal=DB_NAME=appdb \
+            --from-literal=DB_USER=appuser \
+            --from-literal=DB_PASSWORD=apppassword
+
+      # -----------------------------
+      # Deploy PostgreSQL
+      # -----------------------------
+      - name: Deploy PostgreSQL
+        run: |
+          kubectl apply -f k8s/postgres-pvc.yaml
+          kubectl apply -f k8s/postgres-deployment.yaml
+          kubectl apply -f k8s/postgres-service.yaml
+
+      # -----------------------------
+      # Wait for PostgreSQL
+      # -----------------------------
+      - name: Wait for PostgreSQL
+        run: |
+          kubectl rollout status \
+            deployment/postgres \
+            -n infra-challenge \
+            --timeout=120s
+
+      # -----------------------------
+      # Deploy backend
+      # -----------------------------
+      - name: Deploy backend
+        run: |
+          sed "s|k8s-challenge-backend:local|$IMAGE_NAME:${{ github.sha }}|g" \
+            k8s/backend-deployment.yaml \
+            > /tmp/backend-deployment.yaml
+
+          kubectl apply -f /tmp/backend-deployment.yaml
+          kubectl apply -f k8s/backend-service.yaml
+
+      # -----------------------------
+      # Wait for backend
+      # -----------------------------
+      - name: Wait for backend
+        run: |
+          kubectl rollout status \
+            deployment/backend \
+            -n infra-challenge \
+            --timeout=120s
+
+      # -----------------------------
+      # Show cluster state
+      # -----------------------------
+      - name: Show Kubernetes resources
+        run: |
+          kubectl get pods -n infra-challenge
+          kubectl get services -n infra-challenge
+          kubectl get deployments -n infra-challenge
+
+      # -----------------------------
+      # Verify backend health
+      # -----------------------------
+      - name: Verify backend health
+        run: |
+          kubectl run curl-test \
+            -n infra-challenge \
+            --image=curlimages/curl:8.12.1 \
+            --restart=Never \
+            --rm \
+            -i \
+            -- \
+            curl --fail http://backend:8080/health
