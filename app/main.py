@@ -18,11 +18,52 @@ def get_db_connection():
 
 @app.get("/health")
 def health():
+    """
+    Liveness check.
+
+    This endpoint only verifies that the application process
+    is running and responding.
+    """
     return {"status": "healthy"}
+
+
+@app.get("/ready")
+def ready():
+    """
+    Readiness check.
+
+    Verifies that the application can connect to PostgreSQL.
+    Kubernetes uses this endpoint to decide whether the pod
+    should receive traffic.
+    """
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("SELECT 1")
+
+        cursor.close()
+        connection.close()
+
+        return {"status": "ready"}
+
+    except Exception as error:
+        print(f"Readiness check failed: {error}")
+
+        raise HTTPException(
+            status_code=503,
+            detail="Database is not available",
+        )
 
 
 @app.get("/api/users")
 def get_users():
+    """
+    Fetch users from PostgreSQL.
+    """
+    connection = None
+    cursor = None
+
     try:
         connection = get_db_connection()
         cursor = connection.cursor()
@@ -32,9 +73,6 @@ def get_users():
         )
 
         users = cursor.fetchall()
-
-        cursor.close()
-        connection.close()
 
         return [
             {
@@ -47,7 +85,15 @@ def get_users():
 
     except Exception as error:
         print(f"Database connection error: {error}")
+
         raise HTTPException(
             status_code=500,
             detail="Database connection failed",
         )
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if connection:
+            connection.close()
