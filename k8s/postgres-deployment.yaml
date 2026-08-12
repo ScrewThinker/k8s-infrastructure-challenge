@@ -5,17 +5,21 @@ metadata:
   namespace: infra-challenge
 spec:
   replicas: 1
+
   selector:
     matchLabels:
       app: postgres
+
   template:
     metadata:
       labels:
         app: postgres
+
     spec:
       containers:
         - name: postgres
           image: postgres:16
+
           ports:
             - containerPort: 5432
 
@@ -42,7 +46,15 @@ spec:
             - name: postgres-storage
               mountPath: /var/lib/postgresql/data
 
+            - name: postgres-init
+              mountPath: /docker-entrypoint-initdb.d/init.sql
+              subPath: postgres-init.sql
+
       volumes:
         - name: postgres-storage
           persistentVolumeClaim:
             claimName: postgres-pvc
+
+        - name: postgres-init
+          configMap:
+            name: postgres-init
