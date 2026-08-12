@@ -127,9 +127,10 @@ jobs:
       # -----------------------------
       - name: Deploy PostgreSQL
         run: |
-          kubectl apply -f k8s/postgres-pvc.yaml
-          kubectl apply -f k8s/postgres-deployment.yaml
-          kubectl apply -f k8s/postgres-service.yaml
+            kubectl apply -f k8s/postgres-pvc.yaml
+            kubectl apply -f k8s/postgres-init-configmap.yaml
+            kubectl apply -f k8s/postgres-deployment.yaml
+            kubectl apply -f k8s/postgres-service.yaml
 
       # -----------------------------
       # Wait for PostgreSQL
