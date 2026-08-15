@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: infrastructure-challenge
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ScrewThinker/k8s-infrastructure-challenge.git
+    targetRevision: main
+    path: helm/challenge
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: infra-challenge
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m

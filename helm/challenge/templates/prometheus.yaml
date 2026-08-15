@@ -1,0 +1,99 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "challenge.fullname" . }}-prometheus
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 10s
+    scrape_configs:
+      - job_name: challenge-backend
+        dns_sd_configs:
+          - names: ['{{ include "challenge.backendName" . }}-metrics']
+            type: A
+            port: {{ .Values.backend.servicePort }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "challenge.fullname" . }}-prometheus
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: monitoring
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ printf "%s-metrics:%v" (include "challenge.backendName" .) .Values.backend.servicePort | sha256sum }}
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: monitoring
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: prometheus
+          image: {{ .Values.monitoring.image | quote }}
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.time=2h
+          ports:
+            - name: http
+              containerPort: 9090
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml .Values.monitoring.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: http
+            initialDelaySeconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+            - name: data
+              mountPath: /prometheus
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "challenge.fullname" . }}-prometheus
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "challenge.fullname" . }}-prometheus
+  labels:
+    {{- include "challenge.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+spec:
+  type: {{ .Values.monitoring.service.type }}
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: monitoring
+  ports:
+    - name: http
+      port: {{ .Values.monitoring.service.port }}
+      targetPort: http
+      {{- if eq .Values.monitoring.service.type "NodePort" }}
+      nodePort: {{ .Values.monitoring.service.nodePort }}
+      {{- end }}
+{{- end }}

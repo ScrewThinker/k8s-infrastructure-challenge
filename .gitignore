@@ -1,7 +1,9 @@
-.venv/
+node_modules/
+dist/
 __pycache__/
 .pytest_cache/
+.venv/
 *.pyc
 .env
-.idea/
-.vscode/
+coverage.xml
+pytest-cache-files-*/
