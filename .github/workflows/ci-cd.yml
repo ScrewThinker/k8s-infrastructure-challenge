@@ -46,11 +46,11 @@ jobs:
         working-directory: frontend
 
       - name: Validate Kubernetes manifests
-        uses: azure/setup-kubectl@v4
-        with:
-          version: v1.36.1
-
-      - run: kubectl apply --dry-run=client --validate=false -f k8s/
+        run: |
+          docker run --rm \
+            --volume "$PWD:/work" \
+            ghcr.io/yannh/kubeconform:v0.7.0 \
+            -strict -summary /work/k8s
 
       - name: Log in to GHCR
         if: github.event_name != 'pull_request'
