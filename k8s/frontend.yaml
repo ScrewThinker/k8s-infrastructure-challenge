@@ -33,7 +33,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: frontend
-          image: ghcr.io/screwthinker/k8s-infrastructure-challenge-frontend:sha-6a7553c
+          image: ghcr.io/screwthinker/k8s-infrastructure-challenge-frontend:sha-d9e5d69
           imagePullPolicy: IfNotPresent
           env:
             - name: BACKEND_HOST
