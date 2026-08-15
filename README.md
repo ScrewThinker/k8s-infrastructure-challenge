@@ -57,7 +57,7 @@ From the repository root:
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r backend/requirements-dev.txt
-pytest backend/tests
+python -m pytest backend/tests
 
 cd frontend
 npm ci
