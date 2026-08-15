@@ -1,11 +1,11 @@
 images:
   frontend:
     repository: ghcr.io/screwthinker/k8s-infrastructure-challenge-frontend
-    tag: "local"
+    tag: "sha-0594c0f"
     pullPolicy: IfNotPresent
   backend:
     repository: ghcr.io/screwthinker/k8s-infrastructure-challenge-backend
-    tag: "local"
+    tag: "sha-0594c0f"
     pullPolicy: IfNotPresent
 
 secret:
