@@ -25,10 +25,11 @@ jobs:
         shell: bash
         run: |
           [[ "$IMAGE_TAG" =~ ^sha-[0-9a-f]{7}$ ]] || { echo "Invalid tag: $IMAGE_TAG"; exit 1; }
-          sed -i -E "s/^    tag: \"[^\"]+\"/    tag: \"${IMAGE_TAG}\"/" helm/challenge/values.yaml
+          sed -i -E "s|(image: ghcr.io/screwthinker/k8s-infrastructure-challenge-backend:).*|\1${IMAGE_TAG}|" k8s/backend.yaml
+          sed -i -E "s|(image: ghcr.io/screwthinker/k8s-infrastructure-challenge-frontend:).*|\1${IMAGE_TAG}|" k8s/frontend.yaml
           git diff --quiet && { echo "Image tag already current"; exit 0; }
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add helm/challenge/values.yaml
+          git add k8s/backend.yaml k8s/frontend.yaml
           git commit -m "rollback: ${IMAGE_TAG}"
           git push

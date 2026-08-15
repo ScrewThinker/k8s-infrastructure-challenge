@@ -8,9 +8,9 @@ spec:
   source:
     repoURL: https://github.com/ScrewThinker/k8s-infrastructure-challenge.git
     targetRevision: main
-    path: helm/challenge
-    helm:
-      releaseName: challenge
+    path: k8s
+    directory:
+      recurse: true
   destination:
     server: https://kubernetes.default.svc
     namespace: infra-challenge

@@ -5,7 +5,7 @@ A production-style demonstration stack built for a 90-minute DevOps challenge:
 - React frontend served by Nginx
 - Python FastAPI backend
 - Docker images published to GitHub Container Registry (GHCR)
-- Helm-managed Kubernetes resources on Kind
+- Explicit Kubernetes manifests deployed to Kind
 - GitHub Actions CI/CD with Argo CD GitOps delivery
 - HPA, rollback handling, out-of-repository secrets, structured logs, and Prometheus metrics
 - Repeatable service-discovery failure and evidence-driven debugging walkthrough
@@ -28,7 +28,7 @@ Frontend NodePort → Nginx pods (2)
                                                              ▼
                                                         Prometheus
 
-Git push → GitHub Actions → tests → GHCR images → Helm values commit
+Git push → GitHub Actions → tests → GHCR images → manifest image-tag commit
                                                         │
                                                         ▼
                                              Argo CD → Kind cluster
@@ -43,7 +43,6 @@ Run the Kubernetes commands inside the WSL distribution where these are installe
 - Docker
 - Kind
 - kubectl
-- Helm 3
 - Git
 - A public GitHub repository with Actions enabled
 
@@ -64,9 +63,7 @@ npm ci
 npm run build
 cd ..
 
-helm lint helm/challenge
-helm template challenge helm/challenge --namespace infra-challenge > /tmp/challenge-rendered.yaml
-kubectl apply --namespace infra-challenge --dry-run=client -f /tmp/challenge-rendered.yaml
+kubectl apply --namespace infra-challenge --dry-run=client --validate=false -f k8s/
 ```
 
 ## First local deployment
@@ -102,7 +99,7 @@ Then open:
 - Backend through frontend: <http://localhost:8080/api/info>
 - Prometheus targets: <http://localhost:9090/targets>
 
-For a build that never touches GHCR or Argo CD, use `./scripts/deploy-local.sh`. Do not run the local Helm release and Argo CD ownership of the same namespace at the same time.
+For a build that never touches GHCR or Argo CD, use `./scripts/deploy-local.sh`. Do not run imperative local deployment and Argo CD ownership of the same namespace at the same time.
 
 ## CI/CD deployment flow
 
@@ -112,7 +109,7 @@ For a build that never touches GHCR or Argo CD, use `./scripts/deploy-local.sh`.
 2. React dependency installation and production build.
 3. Independent backend and frontend Docker builds.
 4. Push to GHCR using immutable `sha-<7 characters>` tags.
-5. Update both Helm image tags and commit the desired version to `main`.
+5. Update both Deployment image tags and commit the desired version to `main`.
 6. Argo CD notices the commit and synchronizes it to Kind.
 
 GitHub-hosted runners never need access to WSL or its kubeconfig. The pull-based Argo CD agent is the bridge between GitHub and the local cluster.
@@ -138,20 +135,19 @@ For a bad configuration commit, use `git revert <commit>` and push. This is pref
 
 Tradeoff: rollback is auditable but manual. Production progressive delivery should automate rollback against error-rate and latency gates.
 
-### Helm templating
+### Explicit Kubernetes manifests
 
-`helm/challenge` templates Deployments, Services, probes, security contexts, resources, HPA, and Prometheus. Environment-specific choices are values, while the Kubernetes resources remain directly inspectable.
+`k8s/` contains the Deployments, Services, probes, security contexts, resources, HPA, and Prometheus configuration exactly as Kubernetes receives them.
 
 ```bash
-helm lint helm/challenge
-helm template challenge helm/challenge -n infra-challenge | less
+kubectl apply --namespace infra-challenge --dry-run=server -f k8s/
 ```
 
-Tradeoff: Helm reduces repeated YAML but adds rendering/debugging complexity.
+Tradeoff: raw manifests are easier to read and debug, but repeated values must be updated consistently when multiple environments are introduced.
 
 ### Secret management
 
-The chart references an existing `challenge-app-secret`; it never stores secret contents. `bootstrap-platform.sh` creates the Secret from `APP_TOKEN` at runtime. The readiness endpoint refuses traffic when the value is missing.
+The backend manifest references an existing `challenge-app-secret`; it never stores secret contents. `bootstrap-platform.sh` creates the Secret from `APP_TOKEN` at runtime. The readiness endpoint refuses traffic when the value is missing.
 
 Tradeoff: a native Kubernetes Secret is only an API object and is base64-encoded, not inherently encrypted. Production should use encryption at rest and External Secrets backed by Vault or a cloud secret manager.
 

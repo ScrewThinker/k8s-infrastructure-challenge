@@ -10,17 +10,15 @@ fi
 
 kubectl config use-context "kind-${CLUSTER_NAME}"
 
-if ! helm status metrics-server --namespace kube-system >/dev/null 2>&1; then
-  helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/ >/dev/null
-  helm repo update >/dev/null
-  helm install metrics-server metrics-server/metrics-server \
-    --namespace kube-system \
-    --set args[0]=--kubelet-insecure-tls \
-    --set args[1]=--kubelet-preferred-address-types=InternalIP \
-    --wait --timeout 3m
-else
-  kubectl rollout status deployment/metrics-server --namespace kube-system --timeout=2m
+if ! kubectl get deployment metrics-server --namespace kube-system >/dev/null 2>&1; then
+  kubectl apply --filename https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.8.1/components.yaml
 fi
+
+kubectl patch deployment metrics-server \
+  --namespace kube-system \
+  --type strategic \
+  --patch '{"spec":{"template":{"spec":{"containers":[{"name":"metrics-server","args":["--cert-dir=/tmp","--secure-port=10250","--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname","--kubelet-use-node-status-port","--metric-resolution=15s","--kubelet-insecure-tls"]}]}}}}'
+kubectl rollout status deployment/metrics-server --namespace kube-system --timeout=3m
 
 kubectl create namespace infra-challenge --dry-run=client -o yaml | kubectl apply -f -
 kubectl create secret generic challenge-app-secret \

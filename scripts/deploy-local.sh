@@ -17,12 +17,14 @@ kubectl create secret generic challenge-app-secret \
   --from-literal=APP_TOKEN="$APP_TOKEN" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-helm upgrade --install challenge helm/challenge \
-  --namespace infra-challenge \
-  --set images.backend.repository=challenge-backend \
-  --set images.frontend.repository=challenge-frontend \
-  --set images.backend.tag=local \
-  --set images.frontend.tag=local \
-  --atomic --wait --timeout 5m
+kubectl apply --filename k8s/
+kubectl set image deployment/challenge-infrastructure-challenge-backend \
+  backend="$BACKEND_IMAGE" --namespace infra-challenge
+kubectl set image deployment/challenge-infrastructure-challenge-frontend \
+  frontend="$FRONTEND_IMAGE" --namespace infra-challenge
+kubectl rollout status deployment/challenge-infrastructure-challenge-backend \
+  --namespace infra-challenge --timeout=3m
+kubectl rollout status deployment/challenge-infrastructure-challenge-frontend \
+  --namespace infra-challenge --timeout=3m
 
 kubectl get deployment,pod,service,hpa --namespace infra-challenge

@@ -1,8 +1,0 @@
-Frontend:
-  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "challenge.frontendName" . }} 8080:{{ .Values.frontend.service.port }}
-
-Prometheus:
-  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "challenge.fullname" . }}-prometheus 9090:{{ .Values.monitoring.service.port }}
-
-Inspect:
-  kubectl get deploy,pod,svc,hpa -n {{ .Release.Namespace }}

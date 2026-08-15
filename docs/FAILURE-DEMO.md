@@ -4,17 +4,17 @@ This failure changes only the frontend's backend hostname. Nginx cannot resolve 
 
 ## Create the failure
 
-Edit `helm/challenge/values.yaml`:
+Edit the `BACKEND_HOST` value in `k8s/frontend.yaml`:
 
 ```yaml
-frontend:
-  backendHost: "backend-does-not-exist"
+- name: BACKEND_HOST
+  value: backend-does-not-exist
 ```
 
 Commit and push the change. Argo CD will synchronize it automatically.
 
 ```bash
-git add helm/challenge/values.yaml
+git add k8s/frontend.yaml
 git commit -m "demo: break frontend service discovery"
 git push
 ```

@@ -1,10 +1,11 @@
-{{- if .Values.monitoring.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "challenge.fullname" . }}-prometheus
+  name: challenge-infrastructure-challenge-prometheus
+  namespace: infra-challenge
   labels:
-    {{- include "challenge.labels" . | nindent 4 }}
+    app.kubernetes.io/name: infrastructure-challenge
+    app.kubernetes.io/instance: challenge
     app.kubernetes.io/component: monitoring
 data:
   prometheus.yml: |
@@ -13,29 +14,31 @@ data:
     scrape_configs:
       - job_name: challenge-backend
         dns_sd_configs:
-          - names: ['{{ include "challenge.backendName" . }}-metrics']
+          - names: ['challenge-infrastructure-challenge-backend-metrics']
             type: A
-            port: {{ .Values.backend.servicePort }}
+            port: 8000
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "challenge.fullname" . }}-prometheus
+  name: challenge-infrastructure-challenge-prometheus
+  namespace: infra-challenge
   labels:
-    {{- include "challenge.labels" . | nindent 4 }}
+    app.kubernetes.io/name: infrastructure-challenge
+    app.kubernetes.io/instance: challenge
     app.kubernetes.io/component: monitoring
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/instance: challenge
       app.kubernetes.io/component: monitoring
   template:
     metadata:
       annotations:
-        checksum/config: {{ printf "%s-metrics:%v" (include "challenge.backendName" .) .Values.backend.servicePort | sha256sum }}
+        config-revision: "1"
       labels:
-        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/instance: challenge
         app.kubernetes.io/component: monitoring
     spec:
       securityContext:
@@ -46,7 +49,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: prometheus
-          image: {{ .Values.monitoring.image | quote }}
+          image: prom/prometheus:v3.5.0
           args:
             - --config.file=/etc/prometheus/prometheus.yml
             - --storage.tsdb.path=/prometheus
@@ -59,7 +62,12 @@ spec:
             capabilities:
               drop: ["ALL"]
           resources:
-            {{- toYaml .Values.monitoring.resources | nindent 12 }}
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
           readinessProbe:
             httpGet:
               path: /-/ready
@@ -73,27 +81,26 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: {{ include "challenge.fullname" . }}-prometheus
+            name: challenge-infrastructure-challenge-prometheus
         - name: data
           emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "challenge.fullname" . }}-prometheus
+  name: challenge-infrastructure-challenge-prometheus
+  namespace: infra-challenge
   labels:
-    {{- include "challenge.labels" . | nindent 4 }}
+    app.kubernetes.io/name: infrastructure-challenge
+    app.kubernetes.io/instance: challenge
     app.kubernetes.io/component: monitoring
 spec:
-  type: {{ .Values.monitoring.service.type }}
+  type: NodePort
   selector:
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/instance: challenge
     app.kubernetes.io/component: monitoring
   ports:
     - name: http
-      port: {{ .Values.monitoring.service.port }}
+      port: 9090
       targetPort: http
-      {{- if eq .Values.monitoring.service.type "NodePort" }}
-      nodePort: {{ .Values.monitoring.service.nodePort }}
-      {{- end }}
-{{- end }}
+      nodePort: 30090

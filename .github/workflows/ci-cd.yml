@@ -5,7 +5,6 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - helm/challenge/values.yaml
       - docs/**
       - README.md
   workflow_dispatch:
@@ -46,8 +45,12 @@ jobs:
       - run: npm run build
         working-directory: frontend
 
-      - name: Validate Helm chart
-        run: helm lint helm/challenge
+      - name: Validate Kubernetes manifests
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.36.1
+
+      - run: kubectl apply --dry-run=client --validate=false -f k8s/
 
       - name: Log in to GHCR
         if: github.event_name != 'pull_request'
@@ -81,10 +84,11 @@ jobs:
         env:
           IMAGE_TAG: ${{ steps.image.outputs.tag }}
         run: |
-          sed -i -E "s/^    tag: \"[^\"]+\"/    tag: \"${IMAGE_TAG}\"/" helm/challenge/values.yaml
+          sed -i -E "s|(image: ghcr.io/screwthinker/k8s-infrastructure-challenge-backend:).*|\1${IMAGE_TAG}|" k8s/backend.yaml
+          sed -i -E "s|(image: ghcr.io/screwthinker/k8s-infrastructure-challenge-frontend:).*|\1${IMAGE_TAG}|" k8s/frontend.yaml
           git diff --quiet && { echo "Image tag already current"; exit 0; }
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add helm/challenge/values.yaml
+          git add k8s/backend.yaml k8s/frontend.yaml
           git commit -m "deploy: ${IMAGE_TAG} [skip ci]"
           git push

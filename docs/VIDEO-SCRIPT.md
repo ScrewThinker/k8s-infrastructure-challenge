@@ -13,11 +13,11 @@
 
 Explain the request path: browser → Nginx frontend Service → Python backend Service. There is intentionally no database; the backend is the frontend's service dependency.
 
-Explain delivery: push → GitHub-hosted runner tests → two immutable images in GHCR → workflow updates Helm image tags → Argo CD detects Git → Kind converges to desired state.
+Explain delivery: push → GitHub-hosted runner tests → two immutable images in GHCR → workflow updates the Deployment image tags → Argo CD detects Git → Kind converges to desired state.
 
-Show the Helm values/templates rather than hiding Kubernetes resources. Explain probes, CPU/memory requests, HPA (2–5 replicas at 60% CPU), non-root containers, and rolling-update settings.
+Show the explicit files in `k8s/`. Explain probes, CPU/memory requests, HPA (2–5 replicas at 60% CPU), non-root containers, and rolling-update settings.
 
-Explain that `APP_TOKEN` is created directly in the cluster and only referenced by name from Helm. It is never committed to Git.
+Explain that `APP_TOKEN` is created directly in the cluster and only referenced by name from the backend Deployment. It is never committed to Git.
 
 ## 5:30–8:30 — Failure and debugging
 

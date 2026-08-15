@@ -1,0 +1,26 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: challenge-infrastructure-challenge-backend
+  namespace: infra-challenge
+  labels:
+    app.kubernetes.io/name: infrastructure-challenge
+    app.kubernetes.io/instance: challenge
+    app.kubernetes.io/component: backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: challenge-infrastructure-challenge-backend
+  minReplicas: 2
+  maxReplicas: 5
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 60
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
